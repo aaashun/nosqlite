@@ -1,0 +1,11 @@
+This is a simple and very lite nosql implement, in order to replace sqlite.
+
+nosqlite now supports the following main operations:
+    set - add or replace a record
+    get - find a record
+    remove - remove a record
+
+advantages:
+    1. only 300 lines of ansi c code
+    2. it consumes very low memory, about 10MB for 1000000 records
+    3. more better performance than sqlite, about 400000 qps
