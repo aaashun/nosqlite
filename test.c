@@ -7,7 +7,7 @@ main(int argc, char **argv)
 {
     int rv;
     char value[128];
-    unsigned short vlen;
+    int vlen;
 
     struct nosqlite *db = NULL;
 
@@ -22,7 +22,7 @@ main(int argc, char **argv)
     nosqlite_set(db, "key2", 4, "value2", 6);
     nosqlite_set(db, "key3", 4, "value3", 6);
 
-    vlen = (unsigned short)sizeof(value);
+    vlen = (int)sizeof(value);
     rv = nosqlite_get(db, "key1", 4, value, &vlen);
     if (rv) {
         fprintf(stderr, "key1 not found\n");
@@ -37,7 +37,7 @@ main(int argc, char **argv)
         printf("removed key1\n");
     }
 
-    vlen = (unsigned short)sizeof(value);
+    vlen = (int)sizeof(value);
     rv = nosqlite_get(db, "key1", 4, value, &vlen);
     if (rv) {
         printf("key1 is removed, can not be found\n");

@@ -8,9 +8,9 @@ extern "C" {
 struct nosqlite;
 
 struct nosqlite *nosqlite_open(const char *path, int capacity);
-int nosqlite_get(struct nosqlite *db, const unsigned char *key, unsigned char klen, const unsigned char *value, unsigned short *vlen);
-int nosqlite_set(struct nosqlite *db, const unsigned char *key, unsigned char klen, const unsigned char *value, unsigned short vlen);
-int nosqlite_remove(struct nosqlite *db, const unsigned char *key, unsigned char klen);
+int nosqlite_get(struct nosqlite *db, const void *key, int klen, const void *value, int *vlen);
+int nosqlite_set(struct nosqlite *db, const void *key, int klen, const void *value, int vlen);
+int nosqlite_remove(struct nosqlite *db, const void *key, int klen);
 int nosqlite_close(struct nosqlite *db);
 
 #ifdef __cplusplus

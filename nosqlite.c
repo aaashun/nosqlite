@@ -27,6 +27,12 @@ struct nosqlite {
 };
 
 
+static unsigned short
+_le(unsigned short i) {
+    static short d = 0x1122;
+    return  *((char *)&d) == 0x22 ? i : (i << 8 & 0xff00) | (i >> 8 & 0x00ff);
+}
+
 /* DJB hash */
 static unsigned int
 _hash(const unsigned char *key, int klen)
@@ -49,18 +55,6 @@ _hash2(const unsigned char *key, int klen)
     }
     return hash;
 }
-
-/*
-static unsigned int
-_hash3(const unsigned char *key, int klen)
-{
-    unsigned int hash = 0;
-    while (klen--) {
-        hash = ((hash << 5) ^ (hash >> 27)) ^ *key++;
-    }
-    return hash;
-}
-*/
 
 
 static struct node *
@@ -109,13 +103,13 @@ _nfree(struct nosqlite *db, struct node *node)
 
 
 static int
-_append(struct nosqlite *db, const unsigned char *key, unsigned char klen, unsigned int pos)
+_append(struct nosqlite *db, const void *key, int klen, unsigned int pos)
 {
     unsigned int index, hash2;
     struct node *newnode, *node;
 
-    index = _hash(key, klen) % db->capacity;
-    hash2 = _hash2(key, klen);
+    index = _hash((const unsigned char *)key, klen) % db->capacity;
+    hash2 = _hash2((const unsigned char *)key, klen);
 
     if (db->nodes[index].hash2 == 0 && db->nodes[index].pos == 0) {
         newnode = &db->nodes[index];
@@ -174,6 +168,7 @@ nosqlite_open(const char *path, int capacity)
         if (klen > 127) { /* skip erased data */
             fseek(db->file, klen - 128, SEEK_CUR);
             fread(&vlen, 1, 2, db->file);
+            vlen = _le(vlen);
             fseek(db->file, vlen, SEEK_CUR);
             continue;
         }
@@ -187,10 +182,12 @@ nosqlite_open(const char *path, int capacity)
         _append(db, key, klen, pos);
 
         size = (int)fread(&vlen, 1, 2, db->file);
+        vlen = _le(vlen);
         if (size != 2) {
             fprintf(stderr, "failed to read vlen\n");
             goto end;
         }
+
 
         fseek(db->file, vlen, SEEK_CUR);
     }
@@ -206,10 +203,13 @@ end:
 
 
 int
-nosqlite_set(struct nosqlite *db, const unsigned char *key, unsigned char klen, const unsigned char *value, unsigned short vlen)
+nosqlite_set(struct nosqlite *db, const void *key, int _klen, const void *value, int _vlen)
 {
     int rv = -1;
     unsigned int size = 0, pos;
+
+    unsigned char klen = (unsigned char)_klen;
+    unsigned short vlen = (unsigned short)_vlen;
 
     nosqlite_remove(db, key, klen);
 
@@ -217,9 +217,12 @@ nosqlite_set(struct nosqlite *db, const unsigned char *key, unsigned char klen, 
     pos = (unsigned int)ftell(db->file);
     size += (unsigned int)fwrite(&klen, 1, 1, db->file);
     size += fwrite(key, 1, klen, db->file);
-    size += fwrite(&vlen, 1, 2, db->file);
-    size += fwrite(value, 1, vlen, db->file);
 
+    vlen = _le(vlen);
+    size += fwrite(&vlen, 1, 2, db->file);
+    vlen = _le(vlen);
+
+    size += fwrite(value, 1, vlen, db->file);
     if (size != (1 + klen + 2 + vlen)) {
         fprintf(stderr, "failed to write\n");
         goto end;
@@ -238,47 +241,44 @@ end:
  * -2: need larger buffer for value
  */
 int
-nosqlite_get(struct nosqlite *db, const unsigned char *key, unsigned char klen, const unsigned char *value, unsigned short *vlen)
+nosqlite_get(struct nosqlite *db, const void *key, int _klen, const void *value, int *_vlen)
 {
     int rv = -1, size;
 
+    struct node *node;
+    unsigned char klen = (unsigned char)_klen;
+    unsigned short vlen = (unsigned short)*_vlen;
     unsigned int index, hash2;
 
-    struct node *node;
-
-    index = _hash(key, klen) % db->capacity;
-    hash2 = _hash2(key, klen);
+    index = _hash((const unsigned char *)key, klen) % db->capacity;
+    hash2 = _hash2((const unsigned char *)key, klen);
 
     for (node = &db->nodes[index]; node; node = node->next) {
         if (node->hash2 == hash2) {
-            unsigned char klen2;
-            unsigned short vlen2;
-
             fseek(db->file, node->pos, SEEK_SET);
 
             size = 0;
-            size += (unsigned int)fread(&klen2, 1, 1, db->file);
-            fseek(db->file, klen2, SEEK_CUR);
-            size += (unsigned int)fread(&vlen2, 1, 2, db->file);
+            size += (int)fread(&klen, 1, 1, db->file);
+            fseek(db->file, klen, SEEK_CUR);
+            size += (int)fread(&vlen, 1, 2, db->file);
+            vlen = _le(vlen);
 
             if (size != 3) {
                 fprintf(stderr, "failed to read klen or vlen while get\n");
-                break;
-            }
-
-            if (*vlen < vlen2) {
-                rv = -2;
             } else {
-                rv = 0;
-            }
+                if (vlen > (unsigned short)*_vlen) {
+                    vlen = (unsigned short)*_vlen;
+                    rv = -2;
+                } else {
+                    *_vlen = (int)vlen;
+                    rv = 0;
+                }
 
-            *vlen = *vlen >= vlen2 ? vlen2 : *vlen;
-
-            size = fread((void *)value, 1, *vlen, db->file);
-            if (size != *vlen) {
-                rv = -1;
-                fprintf(stderr, "failed to read value while get\n");
-                break;
+                size = fread((void *)value, 1, vlen, db->file);
+                if (size != vlen) {
+                    rv = -1;
+                    fprintf(stderr, "failed to read value while get\n");
+                }
             }
 
             break;
@@ -290,15 +290,16 @@ nosqlite_get(struct nosqlite *db, const unsigned char *key, unsigned char klen, 
 
 
 int
-nosqlite_remove(struct nosqlite *db, const unsigned char *key, unsigned char klen)
+nosqlite_remove(struct nosqlite *db, const void *key, int _klen)
 {
     int rv = -1;
-    unsigned int index, hash2;
 
     struct node *node, *prenode;
+    unsigned char klen = (unsigned char)_klen;
+    unsigned int index, hash2;
 
-    index = _hash(key, klen) % db->capacity;
-    hash2 = _hash2(key, klen);
+    index = _hash((const unsigned char *)key, klen) % db->capacity;
+    hash2 = _hash2((const unsigned char *)key, klen);
 
     for (node = &db->nodes[index], prenode = NULL; node; prenode = node, node = node->next) {
         if (node->hash2 == hash2) {

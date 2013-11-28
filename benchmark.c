@@ -16,8 +16,7 @@ main(int argc, char **argv)
     int i, n = 300000;
     char (*keys)[128] = NULL, *p = NULL;
     char value[65535];
-    unsigned char klen;
-    unsigned short vlen;
+    int klen, vlen;
 
     struct timeval starttime, endtime;
 
@@ -58,9 +57,9 @@ main(int argc, char **argv)
 
     gettimeofday(&starttime, NULL);
     for (i = 0; i < n; ++i) {
-        klen = (unsigned char)strlen(keys[i]);
-        vlen = (unsigned short)sizeof(value);
-        rv = nosqlite_get(db, (unsigned char *)keys[i], klen, (unsigned char *)value, &vlen);
+        klen = (int)strlen(keys[i]);
+        vlen = (int)sizeof(value);
+        rv = nosqlite_get(db, keys[i], klen, value, &vlen);
         if (rv) {
             fprintf(stderr, "%s not found\n", keys[i]);
             goto end;
