@@ -160,10 +160,10 @@ nosqlite_open(const char *path, int capacity)
     db->file = fopen(path, "rb+"); /* open for random read/write */
     if (!db->file) {
         fprintf(stderr, "failed to open: %s\n", path);
-    } else { /* verify version */
+    } else {
         char version[12];
         fread(version, 1, 12, db->file);
-        if (strncmp(version, NOSQLITE_VERSION, 12)) {
+        if (strncmp(version, NOSQLITE_VERSION, 12)) { /* verify version */
             fprintf(stderr, "invalid %s db: %s\n", NOSQLITE_VERSION, path);
         } else {
             while (1) {
@@ -203,13 +203,11 @@ nosqlite_open(const char *path, int capacity)
         }
     }
 
-    rv = 0;
-
-end:
     if (rv && db) {
         nosqlite_close(db);
         db = NULL;
     }
+
     return db;
 }
 
