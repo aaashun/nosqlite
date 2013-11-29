@@ -146,51 +146,63 @@ nosqlite_open(const char *path, int capacity)
     db->capacity = capacity;
     db->nodes = (struct node *)((char *)db + sizeof(struct nosqlite));
 
-    db->file = fopen(path, "a"); /* create if not exist */
-    if (db->file) {
+    db->file = fopen(path, "r");
+    if (!db->file) {
+        db->file = fopen(path, "a"); /* create it */
+        if (db->file) {
+            fwrite(NOSQLITE_VERSION, 1, 12, db->file);
+            fclose(db->file);
+        }
+    } else {
         fclose(db->file);
     }
 
     db->file = fopen(path, "rb+"); /* open for random read/write */
     if (!db->file) {
-        fprintf(stderr, "failed to open: %s", path);
-        goto end;
+        fprintf(stderr, "failed to open: %s\n", path);
+    } else { /* verify version */
+        char version[12];
+        fread(version, 1, 12, db->file);
+        if (strncmp(version, NOSQLITE_VERSION, 12)) {
+            fprintf(stderr, "invalid %s db: %s\n", NOSQLITE_VERSION, path);
+        } else {
+            while (1) {
+                pos = (unsigned int)ftell(db->file);
+
+                size = (unsigned int)fread(&klen, 1, 1, db->file);
+                if (size == 0) { /* eof */
+                    rv = 0;
+                    break;
+                }
+
+                if (klen > 127) { /* skip erased data */
+                    fseek(db->file, klen - 128, SEEK_CUR);
+                    fread(&vlen, 1, 2, db->file);
+                    vlen = _le(vlen);
+                    fseek(db->file, vlen, SEEK_CUR);
+                    continue;
+                }
+
+                size = (unsigned int)fread(&key, 1, (size_t)klen, db->file);
+                if (size != (size_t)klen) {
+                    fprintf(stderr, "failed to read key\n");
+                    break;
+                }
+
+                _append(db, key, klen, pos);
+
+                size = (int)fread(&vlen, 1, 2, db->file);
+                vlen = _le(vlen);
+                if (size != 2) {
+                    fprintf(stderr, "failed to read vlen\n");
+                    break;
+                }
+
+                fseek(db->file, vlen, SEEK_CUR);
+            }
+        }
     }
 
-    while (1) {
-        pos = (unsigned int)ftell(db->file);
-
-        size = (unsigned int)fread(&klen, 1, 1, db->file);
-        if (size == 0) { /* eof */
-            break;
-        }
-
-        if (klen > 127) { /* skip erased data */
-            fseek(db->file, klen - 128, SEEK_CUR);
-            fread(&vlen, 1, 2, db->file);
-            vlen = _le(vlen);
-            fseek(db->file, vlen, SEEK_CUR);
-            continue;
-        }
-
-        size = (unsigned int)fread(&key, 1, (size_t)klen, db->file);
-        if (size != (size_t)klen) {
-            fprintf(stderr, "failed to read key\n");
-            goto end;
-        }
-
-        _append(db, key, klen, pos);
-
-        size = (int)fread(&vlen, 1, 2, db->file);
-        vlen = _le(vlen);
-        if (size != 2) {
-            fprintf(stderr, "failed to read vlen\n");
-            goto end;
-        }
-
-
-        fseek(db->file, vlen, SEEK_CUR);
-    }
     rv = 0;
 
 end:
@@ -225,13 +237,10 @@ nosqlite_set(struct nosqlite *db, const void *key, int _klen, const void *value,
     size += fwrite(value, 1, vlen, db->file);
     if (size != (1 + klen + 2 + vlen)) {
         fprintf(stderr, "failed to write\n");
-        goto end;
+    } else {
+        rv = _append(db, key, klen, pos);
     }
 
-    _append(db, key, klen, pos);
-
-    rv = 0;
-end:
     return rv;
 }
 

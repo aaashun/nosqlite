@@ -1,6 +1,8 @@
 #ifndef NOSQLITE_H_
 #define NOSQLITE_H_
 
+#define NOSQLITE_VERSION "nosqlite 0.1"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
