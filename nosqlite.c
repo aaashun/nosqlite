@@ -162,13 +162,12 @@ nosqlite_open(const char *path, int capacity)
         fprintf(stderr, "failed to open: %s\n", path);
     } else {
         char version[12];
-        fread(version, 1, 12, db->file);
-        if (strncmp(version, NOSQLITE_VERSION, 12)) { /* verify version */
+        size = (unsigned int)fread(version, 1, 12, db->file);
+        if (size != 12 || strncmp(version, NOSQLITE_VERSION, 12)) { /* verify version */
             fprintf(stderr, "invalid %s db: %s\n", NOSQLITE_VERSION, path);
         } else {
             while (1) {
                 pos = (unsigned int)ftell(db->file);
-
                 size = (unsigned int)fread(&klen, 1, 1, db->file);
                 if (size == 0) { /* eof */
                     rv = 0;
@@ -177,27 +176,32 @@ nosqlite_open(const char *path, int capacity)
 
                 if (klen > 127) { /* skip erased data */
                     fseek(db->file, klen - 128, SEEK_CUR);
-                    fread(&vlen, 1, 2, db->file);
+                    size = (unsigned int)fread(&vlen, 1, 2, db->file);
+                    if (size != 2) {
+                        fprintf(stderr, "failed to read erased vlen\n");
+                        break;
+                    }
+
                     vlen = _le(vlen);
                     fseek(db->file, vlen, SEEK_CUR);
                     continue;
                 }
 
                 size = (unsigned int)fread(&key, 1, (size_t)klen, db->file);
-                if (size != (size_t)klen) {
+                if (size != (unsigned int)klen) {
                     fprintf(stderr, "failed to read key\n");
                     break;
                 }
 
                 _append(db, key, klen, pos);
 
-                size = (int)fread(&vlen, 1, 2, db->file);
-                vlen = _le(vlen);
+                size = (unsigned int)fread(&vlen, 1, 2, db->file);
                 if (size != 2) {
                     fprintf(stderr, "failed to read vlen\n");
                     break;
                 }
 
+                vlen = _le(vlen);
                 fseek(db->file, vlen, SEEK_CUR);
             }
         }
@@ -226,13 +230,13 @@ nosqlite_set(struct nosqlite *db, const void *key, int _klen, const void *value,
     fseek(db->file, 0, SEEK_END);
     pos = (unsigned int)ftell(db->file);
     size += (unsigned int)fwrite(&klen, 1, 1, db->file);
-    size += fwrite(key, 1, klen, db->file);
+    size += (unsigned int)fwrite(key, 1, klen, db->file);
 
     vlen = _le(vlen);
-    size += fwrite(&vlen, 1, 2, db->file);
+    size += (unsigned int)fwrite(&vlen, 1, 2, db->file);
     vlen = _le(vlen);
 
-    size += fwrite(value, 1, vlen, db->file);
+    size += (unsigned int)fwrite(value, 1, vlen, db->file);
     if (size != (1 + klen + 2 + vlen)) {
         fprintf(stderr, "failed to write\n");
     } else {
@@ -250,7 +254,8 @@ nosqlite_set(struct nosqlite *db, const void *key, int _klen, const void *value,
 int
 nosqlite_get(struct nosqlite *db, const void *key, int _klen, const void *value, int *_vlen)
 {
-    int rv = -1, size;
+    int rv = -1;
+    unsigned int size;
 
     struct node *node;
     unsigned char klen = (unsigned char)_klen;
@@ -265,9 +270,9 @@ nosqlite_get(struct nosqlite *db, const void *key, int _klen, const void *value,
             fseek(db->file, node->pos, SEEK_SET);
 
             size = 0;
-            size += (int)fread(&klen, 1, 1, db->file);
+            size += (unsigned int)fread(&klen, 1, 1, db->file);
             fseek(db->file, klen, SEEK_CUR);
-            size += (int)fread(&vlen, 1, 2, db->file);
+            size += (unsigned int)fread(&vlen, 1, 2, db->file);
             vlen = _le(vlen);
 
             if (size != 3) {
@@ -281,8 +286,8 @@ nosqlite_get(struct nosqlite *db, const void *key, int _klen, const void *value,
                     rv = 0;
                 }
 
-                size = fread((void *)value, 1, vlen, db->file);
-                if (size != vlen) {
+                size = (unsigned int)fread((void *)value, 1, vlen, db->file);
+                if (size != (unsigned int)vlen) {
                     rv = -1;
                     fprintf(stderr, "failed to read value while get\n");
                 }
