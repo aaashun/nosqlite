@@ -154,13 +154,7 @@ nosqlite_open(const char *path, int capacity)
             fclose(db->file);
         }
     } else {
-        fclose(db->file);
-    }
-
-    db->file = fopen(path, "rb+"); /* open for random read/write */
-    if (!db->file) {
-        fprintf(stderr, "failed to open: %s\n", path);
-    } else {
+        /* mode "r" for fopen has high performance for the following code */
         char version[12];
         size = (unsigned int)fread(version, 1, 12, db->file);
         if (size != 12 || strncmp(version, NOSQLITE_VERSION, 12)) { /* verify version */
@@ -205,6 +199,14 @@ nosqlite_open(const char *path, int capacity)
                 fseek(db->file, vlen, SEEK_CUR);
             }
         }
+
+        fclose(db->file);
+    }
+
+    db->file = fopen(path, "r+"); /* open for random read/write */
+    if (!db->file) {
+        fprintf(stderr, "failed to open: %s\n", path);
+        rv = -1;
     }
 
     if (rv && db) {
