@@ -146,7 +146,7 @@ nosqlite_open(const char *path, int capacity)
     db->capacity = capacity;
     db->nodes = (struct node *)((char *)db + sizeof(struct nosqlite));
 
-    db->file = fopen(path, "r");
+    db->file = fopen(path, "rb");
     if (!db->file) {
         db->file = fopen(path, "a"); /* create it */
         if (db->file) {
@@ -203,7 +203,7 @@ nosqlite_open(const char *path, int capacity)
         fclose(db->file);
     }
 
-    db->file = fopen(path, "r+"); /* open for random read/write */
+    db->file = fopen(path, "rb+"); /* open for random read/write */
     if (!db->file) {
         fprintf(stderr, "failed to open: %s\n", path);
         rv = -1;
