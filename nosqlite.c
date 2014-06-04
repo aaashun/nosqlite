@@ -24,6 +24,7 @@ struct nosqlite {
     struct node *nodes;
     struct page *pages;
     struct node *freelist;
+    unsigned w:1; /* writeable */
 };
 
 
@@ -203,11 +204,18 @@ nosqlite_open(const char *path, int capacity)
         fclose(db->file);
     }
 
+    db->w = 1;
     db->file = fopen(path, "rb+"); /* open for random read/write */
+    if (!db->file) {
+        db->w = 0;
+        db->file = fopen(path, "rb"); /* open for random read only */
+    }
+
     if (!db->file) {
         fprintf(stderr, "failed to open: %s\n", path);
         rv = -1;
     }
+
 
     if (rv && db) {
         nosqlite_close(db);
@@ -226,6 +234,11 @@ nosqlite_set(struct nosqlite *db, const void *key, int _klen, const void *value,
 
     unsigned char klen = (unsigned char)_klen;
     unsigned short vlen = (unsigned short)_vlen;
+
+    if (!db->w) {
+        fprintf(stderr, "this db is readonly\n");
+        return -1;
+    }
 
     nosqlite_remove(db, key, klen);
 
@@ -311,6 +324,11 @@ nosqlite_remove(struct nosqlite *db, const void *key, int _klen)
     struct node *node, *prenode;
     unsigned char klen = (unsigned char)_klen;
     unsigned int index, hash2;
+
+    if (!db->w) {
+        fprintf(stderr, "this db is readonly\n");
+        return -1;
+    }
 
     index = _hash((const unsigned char *)key, klen) % db->capacity;
     hash2 = _hash2((const unsigned char *)key, klen);
