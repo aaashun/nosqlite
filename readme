@@ -11,14 +11,10 @@ advantages:
     3. more better performance than sqlite, about 400000 qps
 
 compile and run the test:
-<pre>
     gcc nosqlite.c test.c -o test
     ./test
-</pre>
 
 NOTICE:
-   the max value size is 64KB by default, that's because `NOSQLITE_VINT` is defined as `unsigned short`, if you want to store larger value you should add a compiling argument `-DNOSQLITE_VINT="unsigned int"`, also there's a testcase in `test.c`
-    <pre>
+   the max value size is 64KB by default, that's because `NOSQLITE_VINT` is defined as `unsigned short`, if you want to store larger value you should add a compiling argument `-DNOSQLITE_VINT="unsigned int"`, also there's a testcase in `test.c`:
         gcc -DNOSQLITE_VINT="unsigned int" nosqlite.c test.c -o test
         ./test
-    </pre>
