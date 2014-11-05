@@ -28,11 +28,24 @@ struct nosqlite {
 };
 
 
+#define _le(i) ((sizeof(NOSQLITE_VINT) == 4) ? _le4(i) : _le2(i))
+
 static unsigned short
-_le(unsigned short i) {
+_le2(unsigned short i) {
     static short d = 0x1122;
     return  *((char *)&d) == 0x22 ? i : (i << 8 & 0xff00) | (i >> 8 & 0x00ff);
 }
+
+
+static unsigned int
+_le4(unsigned int i) {
+    static short d = 0x1122;
+    return  *((char *)&d) == 0x22 ? i : (i << 24 & 0xff000000)
+        | (i << 8  & 0x00ff0000)       
+        | (i >> 8  & 0x0000ff00)       
+        | (i >> 24 & 0x000000ff);      
+}
+
 
 /* DJB hash */
 static unsigned int
@@ -136,7 +149,7 @@ nosqlite_open(const char *path, int capacity)
     int rv = -1;
     struct nosqlite *db;
     unsigned char klen, key[256];
-    unsigned short vlen;
+    NOSQLITE_VINT vlen;
     unsigned int pos, size;
 
     if (capacity <= 0) {
@@ -171,7 +184,7 @@ nosqlite_open(const char *path, int capacity)
 
                 if (klen > 127) { /* skip erased data */
                     fseek(db->file, klen - 128, SEEK_CUR);
-                    size = (unsigned int)fread(&vlen, 1, 2, db->file);
+                    size = (unsigned int)fread(&vlen, 1, sizeof(vlen), db->file);
                     if (size != 2) {
                         fprintf(stderr, "failed to read erased vlen\n");
                         break;
@@ -213,7 +226,8 @@ nosqlite_open(const char *path, int capacity)
 
     if (!db->file) {
         fprintf(stderr, "failed to open: %s\n", path);
-        rv = -1;
+    } else {
+        rv = 0;
     }
 
 
@@ -233,7 +247,15 @@ nosqlite_set(struct nosqlite *db, const void *key, int _klen, const void *value,
     unsigned int size = 0, pos;
 
     unsigned char klen = (unsigned char)_klen;
-    unsigned short vlen = (unsigned short)_vlen;
+    NOSQLITE_VINT vlen = (NOSQLITE_VINT)_vlen;
+
+    if (sizeof(NOSQLITE_VINT) == 2 && _vlen > 65535) {
+        fprintf(stderr, "too large value, the max is 65535\n");
+    } else if (sizeof(NOSQLITE_VINT) == 4 && _vlen > 2147483647) {
+        fprintf(stderr, "too large value, the max is 2147483647\n");
+    } else if (_vlen < 0) {
+        fprintf(stderr, "value length can not be negative");
+    }
 
     if (!db->w) {
         fprintf(stderr, "this db is readonly\n");
@@ -274,7 +296,7 @@ nosqlite_get(struct nosqlite *db, const void *key, int _klen, const void *value,
 
     struct node *node;
     unsigned char klen = (unsigned char)_klen;
-    unsigned short vlen = (unsigned short)*_vlen;
+    NOSQLITE_VINT vlen = (NOSQLITE_VINT)*_vlen;
     unsigned int index, hash2;
 
     index = _hash((const unsigned char *)key, klen) % db->capacity;
@@ -293,8 +315,8 @@ nosqlite_get(struct nosqlite *db, const void *key, int _klen, const void *value,
             if (size != 3) {
                 fprintf(stderr, "failed to read klen or vlen while get\n");
             } else {
-                if (vlen > (unsigned short)*_vlen) {
-                    vlen = (unsigned short)*_vlen;
+                if (vlen > (NOSQLITE_VINT)*_vlen) {
+                    vlen = (NOSQLITE_VINT)*_vlen;
                     rv = -2;
                 } else {
                     *_vlen = (int)vlen;

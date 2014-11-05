@@ -1,6 +1,7 @@
 #include "nosqlite.h"
 
-#include <stdio.h>
+# include <stdio.h>
+# include <stdlib.h>
 
 int
 main(int argc, char **argv)
@@ -11,38 +12,73 @@ main(int argc, char **argv)
 
     struct nosqlite *db = NULL;
 
+    remove("test.db");
     db = nosqlite_open("test.db", 10);
 
     if (!db) {
-        fprintf(stderr, "failed to open test.db\n");
+        printf("failed to open test.db\n");
         goto end;
     }
 
-    nosqlite_set(db, "key1", 4, "value1", 6);
-    nosqlite_set(db, "key2", 4, "value2", 6);
-    nosqlite_set(db, "key3", 4, "value3", 6);
-
-    vlen = (int)sizeof(value);
-    rv = nosqlite_get(db, "key1", 4, value, &vlen);
+    printf("\ntestcase 001: set key1, key2, key3\n");
+    rv = nosqlite_set(db, "key1", 4, "value1", 6);
+    rv |= nosqlite_set(db, "key2", 4, "value2", 6);
+    rv |= nosqlite_set(db, "key3", 4, "value3", 6);
     if (rv) {
-        fprintf(stderr, "key1 not found\n");
+        printf("\tfail - failed to set keys\n");
     } else {
-        printf("key1: %.*s\n", vlen, value);
+        printf("\tpass - set key1, key2, key3 ok\n");
     }
 
+
+    printf("\ntestcase 002: get key1\n");
+    vlen = (int)sizeof(value);
+    rv = nosqlite_get(db, "key1", 4, value, &vlen);
+    if (!rv && vlen == 6 && !strncmp(value, "value1")) {
+        printf("\tpass - key1: %.*s\n", vlen, value);
+    } else {
+        printf("\tfail - key1 not found\n");
+    }
+
+    printf("\ntestcase 003: remove key1\n");
     rv = nosqlite_remove(db, "key1", 4);
     if (rv) {
-        fprintf(stderr, "failed to remove key1\n");
+        printf("\tfail - failed to remove key1\n");
     } else {
-        printf("removed key1\n");
+        printf("\tpass - removed key1\n");
     }
 
+    printf("\ntestcase 004: find removed key1\n");
     vlen = (int)sizeof(value);
     rv = nosqlite_get(db, "key1", 4, value, &vlen);
     if (rv) {
-        printf("key1 is removed, can not be found\n");
+        printf("\tpass - key1 is removed, can not be found\n");
     } else {
-        fprintf(stdout, "key1 is not removed, can be found, key1: %.*s\n", vlen, value);
+        printf("\tfail - key1 is not removed, can be found, key1: %.*s\n", vlen, value);
+    }
+
+    printf("\ntestcase 005: set key4 with 1MB value\n");
+    {
+        char *bigvalue;
+        int   bigvlen, i;
+
+        bigvalue = (char *)malloc(1024000);
+        for (i = 0; i < 1024000; i ++) {
+            *(bigvalue + i) = (char)('0' + i % 10);
+        }
+
+        nosqlite_set(db, "key4", 4, bigvalue, 1024000);
+
+        bigvlen = 1024000;
+        rv = nosqlite_get(db, "key4", 4, bigvalue, &bigvlen);
+        printf("rv: %d, bigvlen: %d\n", rv, bigvlen);
+        if (!rv && bigvlen == 1024000) {
+            printf("\tpass - key4 is found with 1MB value\n");
+        } else {
+            printf("\tfail - key4 not found\n");
+        }
+
+        free(bigvalue);
     }
 
 end:

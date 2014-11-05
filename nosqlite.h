@@ -1,7 +1,11 @@
 #ifndef NOSQLITE_H_
 #define NOSQLITE_H_
 
-#define NOSQLITE_VERSION "nosqlite 0.1"
+#define NOSQLITE_VERSION "nosqlite 0.2"
+#ifndef NOSQLITE_VINT
+#   define NOSQLITE_VINT unsigned short  /* max value size 64KB, 2^16 - 1 */
+/* #define NOSQLITE_VINT unsigned int */ /* max value size 2GB, 2^31 - 1 */
+#endif
 
 #ifdef __cplusplus
 extern "C" {
