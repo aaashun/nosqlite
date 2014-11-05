@@ -57,10 +57,11 @@ main(int argc, char **argv)
         printf("\tfail - key1 is not removed, can be found, key1: %.*s\n", vlen, value);
     }
 
-    printf("\ntestcase 005: set key4 with 1MB value\n");
-    {
+    if (sizeof(NOSQLITE_VINT) == 4) {
         char *bigvalue;
         int   bigvlen, i;
+
+        printf("\ntestcase 005: set key4 with 1MB value\n");
 
         bigvalue = (char *)malloc(1024000);
         for (i = 0; i < 1024000; i ++) {
@@ -71,7 +72,6 @@ main(int argc, char **argv)
 
         bigvlen = 1024000;
         rv = nosqlite_get(db, "key4", 4, bigvalue, &bigvlen);
-        printf("rv: %d, bigvlen: %d\n", rv, bigvlen);
         if (!rv && bigvlen == 1024000) {
             printf("\tpass - key4 is found with 1MB value\n");
         } else {
