@@ -185,7 +185,7 @@ nosqlite_open(const char *path, int capacity)
                 if (klen > 127) { /* skip erased data */
                     fseek(db->file, klen - 128, SEEK_CUR);
                     size = (unsigned int)fread(&vlen, 1, sizeof(vlen), db->file);
-                    if (size != 2) {
+                    if (size != sizeof(vlen)) {
                         fprintf(stderr, "failed to read erased vlen\n");
                         break;
                     }
@@ -203,8 +203,8 @@ nosqlite_open(const char *path, int capacity)
 
                 _append(db, key, klen, pos);
 
-                size = (unsigned int)fread(&vlen, 1, 2, db->file);
-                if (size != 2) {
+                size = (unsigned int)fread(&vlen, 1, sizeof(vlen), db->file);
+                if (size != sizeof(vlen)) {
                     fprintf(stderr, "failed to read vlen\n");
                     break;
                 }
@@ -270,11 +270,11 @@ nosqlite_set(struct nosqlite *db, const void *key, int _klen, const void *value,
     size += (unsigned int)fwrite(key, 1, klen, db->file);
 
     vlen = _le(vlen);
-    size += (unsigned int)fwrite(&vlen, 1, 2, db->file);
+    size += (unsigned int)fwrite(&vlen, 1, sizeof(vlen), db->file);
     vlen = _le(vlen);
 
     size += (unsigned int)fwrite(value, 1, vlen, db->file);
-    if (size != (1 + klen + 2 + vlen)) {
+    if (size != (1 + klen + sizeof(vlen) + vlen)) {
         fprintf(stderr, "failed to write\n");
     } else {
         rv = _append(db, key, klen, pos);
@@ -309,10 +309,10 @@ nosqlite_get(struct nosqlite *db, const void *key, int _klen, const void *value,
             size = 0;
             size += (unsigned int)fread(&klen, 1, 1, db->file);
             fseek(db->file, klen, SEEK_CUR);
-            size += (unsigned int)fread(&vlen, 1, 2, db->file);
+            size += (unsigned int)fread(&vlen, 1, sizeof(vlen), db->file);
             vlen = _le(vlen);
 
-            if (size != 3) {
+            if (size != (1 + sizeof(vlen))) {
                 fprintf(stderr, "failed to read klen or vlen while get\n");
             } else {
                 if (vlen > (NOSQLITE_VINT)*_vlen) {
