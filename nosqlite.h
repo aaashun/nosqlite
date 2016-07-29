@@ -18,6 +18,7 @@ int nosqlite_get(struct nosqlite *db, const void *key, int klen, const void *val
 int nosqlite_set(struct nosqlite *db, const void *key, int klen, const void *value, int vlen);
 int nosqlite_remove(struct nosqlite *db, const void *key, int klen);
 int nosqlite_close(struct nosqlite *db);
+int nosqlite_size(struct nosqlite *db);
 
 #ifdef __cplusplus
 }

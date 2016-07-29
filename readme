@@ -10,11 +10,24 @@ advantages:
     2. it consumes very low memory, about 10MB for 1000000 records
     3. more better performance than sqlite, about 400000 qps
 
-compile and run the test:
+compile and run the test case:
     gcc nosqlite.c test.c -o test
     ./test
+
+compile and run the dict2db, convert dict to db:
+    gcc nosqlite.c dict2db.c -o dict2db
+    ./dict2db sample.dict sample.db
+
+compile and run the benchmark:
+    gcc nosqlite.c benchmark.c -o benchmark
+    ./benchmark sample.dict sample.db capacity check-value-or-not
+
+introduction in Chinese:
+    http://justcodeit.info/blog/a-simple-nosqlite-implementation.html
 
 NOTICE:
    the max value size is 64KB by default, that's because `NOSQLITE_VINT` is defined as `unsigned short`, if you want to store larger value you should add a compiling argument `-DNOSQLITE_VINT="unsigned int"`, also there's a testcase in `test.c`:
         gcc -DNOSQLITE_VINT="unsigned int" nosqlite.c test.c -o test
         ./test
+
+

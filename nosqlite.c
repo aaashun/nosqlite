@@ -27,7 +27,6 @@ struct nosqlite {
     unsigned w:1; /* writeable */
 };
 
-
 #define _le(i) ((sizeof(NOSQLITE_VINT) == 4) ? _le4(i) : _le2(i))
 
 static unsigned short
@@ -394,4 +393,18 @@ nosqlite_close(struct nosqlite *db)
     free(db);
 
     return 0;
+}
+
+int
+nosqlite_size(struct nosqlite *db)
+{
+    int size = 0;
+    struct page *page, *p;
+    for (page = db->pages; page;) {
+        p = page;
+        page = page->next;
+        size += NOSQLITE_PAGESIZE;
+    }
+    size += sizeof(struct nosqlite) + sizeof(struct node) * db->capacity;
+    return size;
 }
